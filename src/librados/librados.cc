@@ -1309,7 +1309,7 @@ int librados::IoCtx::aio_operate(const std::string& oid, AioCompletion *c,
 				  translate_flags(flags));
 }
 
-int librados::IoCtx::aio_operate(const std::string& oid, AioCompletion *c,
+uint64_t librados::IoCtx::aio_operate(const std::string& oid, AioCompletion *c,
 				 librados::ObjectWriteOperation *o,
 				 snap_t snap_seq, std::vector<snap_t>& snaps)
 {
@@ -3572,7 +3572,7 @@ extern "C" int rados_aio_create_completion(void *cb_arg,
     c->set_safe_callback(cb_arg, cb_safe);
   *pc = c;
   int retval = 0;
-  tracepoint(librados, rados_aio_create_completion_exit, retval, *pc);
+  tracepoint(librados, rados_aio_create_completion_exit, retval, cb_arg, *pc);
   return retval;
 }
 
