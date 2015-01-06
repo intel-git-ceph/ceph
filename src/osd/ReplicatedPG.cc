@@ -105,6 +105,12 @@ static void log_subop_stats(
     if (subop == l_osd_sop_w) {
       logger->inc(l_osd_sop_w_inb, inb);
       logger->tinc(l_osd_sop_w_lat, latency);
+      {
+#ifdef WITH_LTTNG
+      osd_reqid_t reqid = op->get_reqid();
+      tracepoint(osd, log_subop_stats, reqid.name._type, reqid.name._num, reqid.tid, reqid.inc, latency.to_nsec() );
+#endif
+      }
     } else if (subop == l_osd_sop_push) {
       logger->inc(l_osd_sop_push_inb, inb);
       logger->tinc(l_osd_sop_push_lat, latency);
@@ -1286,6 +1292,13 @@ void ReplicatedPG::do_request(
 
   switch (op->get_req()->get_type()) {
   case CEPH_MSG_OSD_OP:
+    {
+#ifdef WITH_LTTNG
+    MOSDSubOp *m = static_cast<MOSDSubOp*>(op->get_req());
+    ceph_tid_t rep_tid = m->get_tid();
+    tracepoint(osd, ceph_msg_osd_op, op->get_reqid().name._type, op->get_reqid().name._num, op->get_reqid().tid, op->get_reqid().inc, rep_tid );
+#endif
+    }
     if (is_replay()) {
       dout(20) << " replay, waiting for active on " << op << dendl;
       waiting_for_active.push_back(op);
@@ -1963,6 +1976,14 @@ void ReplicatedPG::execute_ctx(OpContext *ctx)
   // before we finally apply the resulting transaction.
   delete ctx->op_t;
   ctx->op_t = pgbackend->get_transaction();
+  {
+#ifdef WITH_LTTNG
+      osd_reqid_t reqid = op->get_reqid();
+      ceph_tid_t rep_tid = m->get_tid();
+      tracepoint(osd, eval_repop, reqid.name._type, reqid.name._num, reqid.tid, reqid.inc, rep_tid);
+#endif
+  }
+
 
   if (op->may_write() || op->may_cache()) {
     op->mark_started();
@@ -2177,6 +2198,12 @@ void ReplicatedPG::log_op_stats(OpContext *ctx)
   osd->logger->inc(l_osd_op_inb, inb);
   osd->logger->tinc(l_osd_op_lat, latency);
   osd->logger->tinc(l_osd_op_process_lat, process_latency);
+  {
+#ifdef WITH_LTTNG
+    osd_reqid_t reqid = ctx->op->get_reqid();
+    tracepoint(osd, log_op_stats, reqid.name._type, reqid.name._num, reqid.tid, reqid.inc, latency.to_nsec(), process_latency.to_nsec());
+#endif
+  }
 
   if (op->may_read() && op->may_write()) {
     osd->logger->inc(l_osd_op_rw);
@@ -7057,6 +7084,12 @@ void ReplicatedPG::repop_all_applied(RepGather *repop)
 {
   dout(10) << __func__ << ": repop tid " << repop->rep_tid << " all applied "
 	   << dendl;
+  {
+#ifdef WITH_LTTNG
+    osd_reqid_t reqid = repop->ctx->op->get_reqid();
+    tracepoint(osd, repop_all_applied, reqid.name._type, reqid.name._num, reqid.tid, reqid.inc);
+#endif
+  }
   repop->all_applied = true;
   if (!repop->rep_aborted) {
     eval_repop(repop);
@@ -7082,6 +7115,12 @@ void ReplicatedPG::repop_all_committed(RepGather *repop)
 {
   dout(10) << __func__ << ": repop tid " << repop->rep_tid << " all committed "
 	   << dendl;
+  {
+#ifdef WITH_LTTNG
+    osd_reqid_t reqid = repop->ctx->op->get_reqid();
+    tracepoint(osd, repop_all_committed, reqid.name._type, reqid.name._num, reqid.tid, reqid.inc);
+#endif
+  }
   repop->all_committed = true;
 
   if (!repop->rep_aborted) {
@@ -7139,6 +7178,13 @@ void ReplicatedPG::eval_repop(RepGather *repop)
     return;
 
   if (m) {
+    {
+#ifdef WITH_LTTNG
+      osd_reqid_t reqid = repop->ctx->op->get_reqid();
+      ceph_tid_t rep_tid = m->get_tid();
+      tracepoint(osd, eval_repop, reqid.name._type, reqid.name._num, reqid.tid, reqid.inc, rep_tid);
+#endif
+    }
 
     // an 'ondisk' reply implies 'ack'. so, prefer to send just one
     // ondisk instead of ack followed by ondisk.
